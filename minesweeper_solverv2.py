@@ -28,45 +28,42 @@ class mineCell:
         self.safe_flagged = False
         self.failed = False
         self.nr_surrounding_bombs = -1
-        self.neighbours = []
+        # self.neighbours = []
 
-        self.pseudo_bomb_flagged = False
-        self.safe_flagged = False
+    # def bom_chance(self):
+    #     bom_cells = self.bom_candidates_neighbours()
+    #     nr_bom_candidates = len(bom_cells)
+    #     if nr_bom_candidates == 0:
+    #         return 0
+    #     else:
+    #         bom_chance = (self.nr_surrounding_bombs - self.nr_bom_neighbours()) / nr_bom_candidates
+    #         return bom_chance
 
-    def bom_chance(self):
-        bom_cells = self.bom_candidates_neighbours()
-        nr_bom_candidates = len(bom_cells)
-        if nr_bom_candidates == 0:
-            return 0
-        else:
-            bom_chance = (self.nr_surrounding_bombs - self.nr_bom_neighbours()) / nr_bom_candidates
-            return bom_chance
+    # def update_bom_probability_neighbours(self):
+    #     nr_flagged_bombs = 0
+    #     bom_chance = self.bom_chance()
+    #     for n in self.bom_candidates_neighbours():
+    #         n.probability = bom_chance
+    #         if n.probability >= 1.:
+    #             n.bomb_flagged = True
+    #             nr_flagged_bombs += 1
+    #         elif n.probability == 0.0:
+    #             n.safe_flagged = True
+    #     return nr_flagged_bombs
 
-    def update_bom_probability_neighbours(self):
-        nr_flagged_bombs = 0
-        bom_chance = self.bom_chance()
-        for n in self.bom_candidates_neighbours():
-            n.probability = bom_chance
-            if n.probability >= 1.:
-                n.bomb_flagged = True
-                nr_flagged_bombs += 1
-            elif n.probability == 0.0:
-                n.safe_flagged = True
-        return nr_flagged_bombs
+    # def bom_candidates_neighbours(self):
+    #     bom_candidate_neighbours = []
+    #     for n in self.neighbours:
+    #         if (n.safe_flagged == False) & (n.bomb_flagged == False):
+    #             bom_candidate_neighbours += [n]
+    #     return bom_candidate_neighbours
 
-    def bom_candidates_neighbours(self):
-        bom_candidate_neighbours = []
-        for n in self.neighbours:
-            if (n.safe_flagged == False) & (n.bomb_flagged == False):
-                bom_candidate_neighbours += [n]
-        return bom_candidate_neighbours
-
-    def nr_bom_neighbours(self):
-        bom_neighbours = 0
-        for n in self.neighbours:
-            if n.bomb_flagged == True:
-                bom_neighbours += 1
-        return bom_neighbours
+    # def nr_bom_neighbours(self):
+    #     bom_neighbours = 0
+    #     for n in self.neighbours:
+    #         if n.bomb_flagged == True:
+    #             bom_neighbours += 1
+    #     return bom_neighbours
 
   
 class mineFieldArray:
@@ -78,7 +75,7 @@ class mineFieldArray:
         self.nr_flagged_bombs = 0
 
         self.mine_array = [[mineCell((j,i), bom_density) for j in range(width)] for i in range(height)]
-        self._find_neighbours()
+        # self._find_neighbours()
 
         self.color_map = {1: np.array([255, 0, 0]), # red
                         2: np.array([0, 255, 0]), # green
@@ -86,14 +83,62 @@ class mineFieldArray:
                         4: np.array([144, 238, 144]), #light green
                         5: np.array([119, 0, 200])} #purple
     
-    def _find_neighbours(self):
-        for r in range(0, self.height):
-            for c in range(0, self.width):
-                cell = self.mine_array[r][c]
-                for h in range(r-1, r+2):
-                    for w in range(c-1, c+2):
-                        if ((w >= 0) & (h >= 0)) & ((w < self.width) & (h < self.height)) & (w != c or h != r):
-                            cell.neighbours.append(self.mine_array[h][w])
+    # def find_neighbours(self):
+    #     for r in range(0, self.height):
+    #         for c in range(0, self.width):
+    #             cell = self.mine_array[r][c]
+    #             for h in range(r-1, r+2):
+    #                 for w in range(c-1, c+2):
+    #                     if ((w >= 0) & (h >= 0)) & ((w < self.width) & (h < self.height)) & (w != c or h != r):
+    #                         cell.neighbours.append(self.mine_array[h][w])
+
+    def find_cell_neighbours(self, cell):
+        neighbours = []
+        column = cell.coordinates[0]
+        row = cell.coordinates[1]
+        for h in range(row-1, row+2):
+            for w in range(column-1, column+2):
+                if ((w >= 0) & (h >= 0)) & ((w < self.width) & (h < self.height)) & (w != column or h != row):
+                    neighbours.append(self.mine_array[h][w])
+        return neighbours
+
+    def bom_chance(self, cell):
+        bom_cells = self.bom_candidates_neighbours(cell)
+        nr_bom_candidates = len(bom_cells)
+        if nr_bom_candidates == 0:
+            return 0
+        else:
+            bom_chance = (cell.nr_surrounding_bombs - self.nr_bom_neighbours(cell)) / nr_bom_candidates
+            return bom_chance
+
+    def update_bom_probability_neighbours(self, cell):
+        bom_chance = self.bom_chance(cell)
+        for n in self.bom_candidates_neighbours(cell):
+            n.probability = bom_chance
+            if n.probability >= 1.:
+                n.bomb_flagged = True
+                self.nr_flagged_bombs += 1
+            elif n.probability == 0.0:
+                n.safe_flagged = True
+        # return nr_flagged_bombs
+
+    def bom_candidates_neighbours(self, cell):
+        bom_candidate_neighbours = []
+        for n in self.find_cell_neighbours(cell):
+            if (n.safe_flagged == False) & (n.bomb_flagged == False):
+                bom_candidate_neighbours += [n]
+        return bom_candidate_neighbours
+
+    def nr_bom_neighbours(self, cell):
+        bom_neighbours = 0
+        for n in self.find_cell_neighbours(cell):
+            if n.bomb_flagged == True:
+                bom_neighbours += 1
+        return bom_neighbours
+
+
+
+
 
     def bomb_candidates(self):
         unkown_cells = []
@@ -111,17 +156,14 @@ class mineFieldArray:
                     unkown_cells += [cell]  
         return unkown_cells 
     
-    def revealed_unsolved(self, mines = []):
+    def revealed_unsolved(self):
         '''cells whos all adjecent mines have not been found yet'''
-        if mines == []:
-            mines = self.mine_array
-
         revealed_unsolved = []
-        for row in mines:
+        for row in self.mine_array:
             for cell in row:
                 if (cell.revealed == True):
                     unkown_cell_bool = False
-                    for n in cell.neighbours:
+                    for n in self.find_cell_neighbours(cell):
                         if (n.safe_flagged == False) & (n.bomb_flagged == False):
                             unkown_cell_bool = True
                     if unkown_cell_bool == True:
@@ -130,7 +172,7 @@ class mineFieldArray:
 
     def update_cells(self):
         for cell in self.revealed_unsolved():
-            self.nr_flagged_bombs += cell.update_bom_probability_neighbours()
+            self.update_bom_probability_neighbours(cell)
         return 
 
     def update_bom_field_density(self):
@@ -141,26 +183,57 @@ class mineFieldArray:
                 if cell.probability == self.prev_bom_density:
                     cell.probability = bom_density
             self.prev_bom_density = bom_density
+    
+    def try_guessing(self):
+        unresolved_cells = self.revealed_unsolved()
+
+        for cell_i in unresolved_cells:
+            remaining_mines = cell_i.nr_surrounding_bombs - self.nr_bom_neighbours(cell_i)
+
+            if remaining_mines == 1:
+                mine_candidates = self.bom_candidates_neighbours(cell_i)
+                coord_mine_candidates = [cell.coordinates for cell in mine_candidates]
+                
+                adjecent_unresolved_cells = []
+                for cell_r in unresolved_cells:
+                    if cell_r in self.find_cell_neighbours(cell_i):
+                        adjecent_unresolved_cells += [cell_r]
+                
+                for cell_i_n in mine_candidates:
+                    coord_cell_i_n = cell_i_n.coordinates
+                    for cell_r in adjecent_unresolved_cells:
+                        adjecent_unresolved_mine_candidates = self.bom_candidates_neighbours(cell_r)
+                        coord_adjecent_unresolved_mine_candidates = [cell.coordinates for cell in adjecent_unresolved_mine_candidates]
+
+                        if coord_cell_i_n not in coord_adjecent_unresolved_mine_candidates:
+                            mine_fields_left = len([coord for coord in coord_adjecent_unresolved_mine_candidates if coord not in coord_mine_candidates])
+
+                            if mine_fields_left < (cell_r.nr_surrounding_bombs - self.nr_bom_neighbours(cell_r)):
+                                cell_i_n.safe_flagged = True
+                                cell_i_n.probability = 0.0
+                                self.update_cells()
+                                return
+        return
+
+        # copy_mine_array = copy.deepcopy(self.mine_array)
+        # for cell_ru in self.revealed_unsolved():
+        #     for cell_ru_n in self.bom_candidates_neighbours(cell_ru):
+        #         cell_ru_n.bomb_flagged = True
+        #         self.update_bom_probability_neighbours(cell_ru_n)
+        #         for cell_ru_2 in self.revealed_unsolved(copy_mine_array):
+        #             mine_candidates = self.bom_candidates_neighbours(cell_ru_2)
+        #             if (cell_ru_2.nr_surrounding_bombs - cell_ru_2.nr_bom_neighbours()) > len(mine_candidates):
+        #                 #selected cell cannot be a mine
+        #                 cell_ru_n.bomb_flagged = False
+        #                 cell_ru_n.probability = 0.0
+        #                 self.nr_flagged_bombs += self.update_cells()
+        #                 return 
+        #         cell_ru_n.bomb_flagged = False
+        # return
 
     def sortComparatorByProb(self, item):
         return item.probability
-    
-    def try_guessing(self):
-        for cell_ru in self.revealed_unsolved():
-            for cell_ru_n in cell_ru.bom_candidates_neighbours():
-                cell_ru_n.pseudo_bomb_flagged = True
-                cell_ru_n.pseudo_update_bom_probability_neighbours()
-                for cell_ru_2 in self.revealed_unsolved():
-                    mine_candidates = cell_ru_2.bom_candidates_neighbours()
-                    if (cell_ru_2.nr_surrounding_bombs - cell_ru_2.nr_bom_neighbours()) > len(mine_candidates):
-                        #selected cell cannot be a mine
-                        cell_ru_n.bomb_flagged = False
-                        cell_ru_n.probability = 0.0
-                        self.nr_flagged_bombs += self.update_cells()
-                        return 
-                cell_ru_n.bomb_flagged = False
-        return
-                    
+
     def lowest_bomb_prob(self):
         check_cells = self.un_revealed_cells()
         check_cells.sort(key= self.sortComparatorByProb)
@@ -169,8 +242,8 @@ class mineFieldArray:
         return check_cells
     
     def return_next_cell(self):
-        # if self.lowest_bomb_prob()[0].probability > 0:
-        #     self.try_guessing()
+        if self.lowest_bomb_prob()[0].probability > 0:
+            self.try_guessing()
         return self.lowest_bomb_prob()[0] 
 
     def plot_minefield(self, with_timer = True, title = ""):
@@ -249,7 +322,7 @@ while field.nr_flagged_bombs != nr_mines:
         title = "We lost... :c"
         break
 
-    field.nr_flagged_bombs += item.update_bom_probability_neighbours()
+    field.update_bom_probability_neighbours(item)
 
     field.update_bom_field_density()
     field.update_cells()

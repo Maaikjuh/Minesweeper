@@ -2,9 +2,9 @@ from DecodeDemcon3 import mineField
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-# from celluloid import Camera
 
-ENTER_MODE = "Expert" #"Intermediate" # "Beginner" #
+# select mode
+ENTER_MODE = "Beginner" #"Intermediate" #"Expert" # 
 
 if ENTER_MODE == "Beginner":
     mode = mineField.BEGINNER_FIELD
@@ -58,10 +58,11 @@ class mineFieldArray:
         '''Return all neighbours of a cell
 
         Arguments:
-        cell -- mineCell object for which to find all neighbours
+        cell    -- mineCell object for which to find all neighbours
+        n_range -- range to find cell neighbours. By default direct neighbours
 
         Returns:
-        all neighbouring mine cell objects        
+        all neighbouring mine cell objects within specified range     
         '''
 
         neighbours = []
@@ -156,7 +157,7 @@ class mineFieldArray:
         cell -- mineCell object of which to receive the mine probability for the neighbours  
 
         Returns:
-        probability that cell is a mine (0: safe -> 1: mine)   
+        probability that cell is a mine (0.0: safe -> 1.0: mine)   
         '''
 
         # get all neigbours that might be a mine
@@ -177,8 +178,9 @@ class mineFieldArray:
         ''' 
         mine_probability = self.mine_probability(cell) #mine probability of neighbouring cells
         for n in self.mine_candidates_neighbours(cell):
+            # only update probability if this increases the mine probability (otherwise it might be overwritten by another lower prob cell)
             if (mine_probability > n.probability) or (mine_probability == 0.) or (mine_probability == 1.):
-                n.probability = mine_probability #nothing fancy, I'm sure there's some way to add probabilities, but this seems to work OK..
+                n.probability = mine_probability # nothing fancy, I'm sure there's some way to add probabilities, but this seems to work OK..
                 if n.probability >= 1.:
                     # neighbouring cell is a mine
                     n.mine_flagged = True
@@ -194,7 +196,6 @@ class mineFieldArray:
         '''
         for cell in self.revealed_unsolved():
             self.update_mine_probability_neighbours(cell)
-        # return 
 
     def update_mine_field_density(self):
         '''Update the mine densitity for the remaining cells in the field
@@ -234,12 +235,19 @@ class mineFieldArray:
             
             # find mine cells by deducing if a revealed unsolved cell can only reach its required mine number if certain cell(s) are a mine. 
             for au_cell in adjecent_unresolved_cells:
+                # the neigbour of the unsolved cell may only have one mine left. Otherwise this trick won't work
                 if (au_cell.nr_surrounding_mines - self.nr_mine_neighbours(au_cell)) == 1:
                     # get coordinates of the mine candidate cells of the revealed unsolved neighbour of the revealed unsolved cell 
                     adjecent_unresolved_mine_candidates = self.mine_candidates_neighbours(au_cell)
                     coord_adjecent_unresolved_mine_candidates = [cell.coordinates for cell in adjecent_unresolved_mine_candidates]
+
+                    # get cells that the unsolved cell does not share with it's neighbour
                     unique_mine_candidates = [cell for cell in mine_candidates if cell.coordinates not in coord_adjecent_unresolved_mine_candidates]
                     
+                    # If the neighbour only needs one more mine, and the unsolved cell still needs more than one mine,
+                    # that/those remaining mine(s) should be located in cells that are not shared with the neighbour (a "unique" cell).
+                    # If the number of unique cells equals the number of mines that the unsolved cell still needs even after sharing a mine with it's neighbour,
+                    # all those unique cells must harbor a mine. 
                     if (len(unique_mine_candidates) == (remaining_mines - 1)) & (len(unique_mine_candidates) != 0):
                         for cell in unique_mine_candidates:
                             cell.mine_flagged = True
@@ -247,32 +255,24 @@ class mineFieldArray:
                             print('Mine cell found!')
                         self.update_cells()
 
-            # only do this trick if the cell only has one mine left to find
+            # find safe cells by deducing if the game would break if there's a mine at a certain cell
+            # only do this trick if the revealed unsolved cell only has one mine left to find
             # otherwise, there are too many possibilities and this won't work
-            if remaining_mines == 1:
-                # mine_candidates = self.mine_candidates_neighbours(cell_i)
-                # coord_mine_candidates = [cell.coordinates for cell in mine_candidates] #coordinates of all neighbouring mine candidate cells of the revealed unsolved cell
-                
-                # # get all revealed unsolved neighbours of the current revealed unsolved cell
-                # adjecent_unresolved_cells = []
-                # for cell_r in unresolved_cells:
-                #     if cell_r in self.find_cell_neighbours(cell_i):
-                #         adjecent_unresolved_cells += [cell_r]
-                
-                # loop over the mine candiates of the revealed unsolved cell to check whether this cell can be a mine
-                for cell_i_n in mine_candidates:
-                    coord_cell_i_n = cell_i_n.coordinates
+            if remaining_mines == 1:               
+                # loop over the mine candiates of the revealed unsolved cell to check whether the candidate can be a mine
+                for candidate_cell in mine_candidates:
+                    coord_candidate_cell = candidate_cell.coordinates
 
                     # loop over the revealed unsolved neighbours of the revealed unsolved cell 
                     # to check if one of these neighbours cannot reach it's required number of neighbouring mines
-                    # if the current cell is a mine
+                    # if the current candidate is a mine
                     for cell_r in adjecent_unresolved_cells:
                         # get coordinates of the mine candidate cells of the revealed unsolved neighbour of the revealed unsolved cell 
                         adjecent_unresolved_mine_candidates = self.mine_candidates_neighbours(cell_r)
                         coord_adjecent_unresolved_mine_candidates = [cell.coordinates for cell in adjecent_unresolved_mine_candidates]
 
                         # There can only be an issue if current cell is a mine and does not neighbour to the current revealed unsolved neighbour
-                        if coord_cell_i_n not in coord_adjecent_unresolved_mine_candidates:
+                        if coord_candidate_cell not in coord_adjecent_unresolved_mine_candidates:
                             # check how many mine cell candidates would be left for the current revealed unsolved neighbour if the current cell is a mine
                             mine_fields_left = len([coord for coord in coord_adjecent_unresolved_mine_candidates if coord not in coord_mine_candidates])
 
@@ -280,8 +280,8 @@ class mineFieldArray:
                             # than that the current revealed unsolved neighbour has unresolved mines left, this would break the game.
                             # Therefore, the current cell cannot be a mine and is flagged accordingly. 
                             if mine_fields_left < (cell_r.nr_surrounding_mines - self.nr_mine_neighbours(cell_r)):
-                                cell_i_n.safe_flagged = True
-                                cell_i_n.probability = 0.0
+                                candidate_cell.safe_flagged = True
+                                candidate_cell.probability = 0.0
                                 print('Safe cell found!')
                                 self.update_cells()
         return
@@ -293,7 +293,7 @@ class mineFieldArray:
 
     def lowest_mineb_prob(self) -> list:
         '''Return all unrevealed cells in the field, 
-        sorted on NOT being a mine
+        sorted on lowest probability of being a mine
 
         Returns:
         list of all unrevealed cells in field
@@ -316,6 +316,10 @@ class mineFieldArray:
 
     def plot_minefield(self, with_timer = True, title = ""):
         '''Generate figure of the current minefield status
+
+        Arguments:
+        with_timer -- if True, plot dissapears after 2s
+        title -- Additional title that is added to the plot
         '''
         # generate array for all number values that will be shown
         plot_array =  [["" for j in range(self.width)] for i in range(self.height)]
@@ -340,7 +344,7 @@ class mineFieldArray:
                     plot_array[r][c] = "x"
                     color_array[r][c] = self.color_map[1]
                 elif cell.failed == True:
-                    # cell was revealed, but was a mine so we failed
+                    # cell was revealed, but was a mine so we failed ;c
                     plot_array[r][c] = "x"
                     color_array[r][c] = self.color_map[5]
                 else:
@@ -349,13 +353,13 @@ class mineFieldArray:
                     color_array[r][c] = self.color_map[3]   
 
         # display the plot 
-        fig, ax = plt.subplots(1,1)
+        fig, ax = plt.subplots(1,1, figsize=(self.width *.5, self.height *.5)) # figsize is scaled to minefield size
         ax.imshow(color_array)
 
         def close_event():
-            plt.close() #timer calls this function after 3 seconds and closes the window 
+            plt.close() #timer calls this function after 2 seconds and closes the window 
 
-        timer = fig.canvas.new_timer(interval = 2000) #creating a timer object and setting an interval of 3000 milliseconds
+        timer = fig.canvas.new_timer(interval = 2000) #creating a timer object and setting an interval of 2000 milliseconds
         timer.add_callback(close_event)
 
         # add numbers to the plot 
@@ -419,7 +423,7 @@ if __name__ == '__main__':
         field.update_mine_field_density()
         field.update_cells() # also update probability for all other cells in the field
 
-        # field.plot_minefield(with_timer = False)
+        # field.plot_minefield(with_timer = True) # uncomment this line to plot the field after each iteration
 
     field.plot_minefield(with_timer = False, title = title)
 
